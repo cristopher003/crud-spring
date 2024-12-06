@@ -1,11 +1,14 @@
 package com.example.prueba.application.services;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.prueba.application.dtos.UsuarioRequestDTO;
+import com.example.prueba.application.dtos.UsuarioResponseDTO;
+import com.example.prueba.application.mappers.UsuarioMapper;
 import com.example.prueba.domain.Usuario;
 import com.example.prueba.infrastructure.repositories.UsuarioRepository;
 
@@ -17,31 +20,39 @@ import lombok.RequiredArgsConstructor;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final UsuarioMapper usuarioMapper;
 
      @Transactional(readOnly = true)
-    public List<Usuario> obtenerTodos() {
-        return usuarioRepository.findAll();
+    public List<UsuarioResponseDTO> obtenerTodos() {
+        // return usuarioRepository.findAll();
+        return usuarioRepository.findAll().stream()
+            .map(usuarioMapper::toResponseDTO)
+            .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public Optional<Usuario> obtenerPorId(Long id) {
-        return usuarioRepository.findById(id);
+    public UsuarioResponseDTO obtenerPorId(Long id) {
+        Usuario usuario=usuarioRepository.findById(id).orElseThrow(()->new RuntimeException("Usuario no encontrado con ID: " + id));
+        return usuarioMapper.toResponseDTO(usuario);
     }
 
      @Transactional
-    public Usuario crear(@Valid Usuario usuario) {
-        if (usuarioRepository.findByEmail(usuario.getEmail()).isPresent()) {
+    public UsuarioResponseDTO crear(@Valid UsuarioRequestDTO usuarioDTO) {
+
+        if (usuarioRepository.findByEmail(usuarioDTO.getEmail()).isPresent()) {
             throw new RuntimeException("El email ya existe");
         }
-        return usuarioRepository.save(usuario);
+
+        Usuario usuario=usuarioMapper.toEntity(usuarioDTO);
+        return usuarioMapper.toResponseDTO(usuarioRepository.save(usuario));
     }
 
     @Transactional
-    public Usuario actualizar(Long id, @Valid Usuario usuarioActualizado) {
+    public UsuarioResponseDTO actualizar(Long id, @Valid UsuarioRequestDTO usuarioDTO) {
         Usuario usuarioExistente = usuarioRepository.findById(id)
         .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
    
-        usuarioRepository.findByEmail(usuarioActualizado.getEmail())
+        usuarioRepository.findByEmail(usuarioDTO.getEmail())
         .ifPresent(usuario -> {
             // Si el email encontrado no es el mismo usuario que estamos actualizando
             if (!usuario.getId().equals(id)) {
@@ -50,12 +61,12 @@ public class UsuarioService {
         });
         
        
-                usuarioExistente.setNombre(usuarioActualizado.getNombre());
-                usuarioExistente.setEmail(usuarioActualizado.getEmail());
-                usuarioExistente.setContrasena(usuarioActualizado.getContrasena());
+                usuarioExistente.setNombre(usuarioDTO.getNombre());
+                usuarioExistente.setEmail(usuarioDTO.getEmail());
+                usuarioExistente.setContrasena(usuarioDTO.getContrasena());
 
-                return usuarioRepository.save(usuarioExistente);
-            
+
+                return usuarioMapper.toResponseDTO(usuarioRepository.save(usuarioExistente));
             
     }
 
@@ -65,4 +76,6 @@ public class UsuarioService {
             .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         usuarioRepository.delete(usuario);
     }
+
+    
 }
